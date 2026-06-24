@@ -34,7 +34,6 @@
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
-    // Preloaded high-fidelity clinical diagnostic portfolios
     const PRELOADED_RECORDS = [
       {
         id: 'rec_01',
@@ -121,7 +120,6 @@ Clinical Notes: Severe sleep fragmentation reported. High physical load but comp
       }
     ];
 
-    // --- STREAMING_CHUNK:Custom SVG Icon Renderer to keep app ultra-lightweight and single-file ---
     const Icon = ({ name, size = 16, className = "" }) => {
       const svgs = {
         activity: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>,
@@ -140,7 +138,6 @@ Clinical Notes: Severe sleep fragmentation reported. High physical load but comp
       return svgs[name] || null;
     };
 
-    // --- STREAMING_CHUNK:App logic, state hooks, and live API probes ---
     function App() {
       const [apiKeyInput, setApiKeyInput] = useState('');
       const [isNightVision, setIsNightVision] = useState(true);
@@ -154,7 +151,7 @@ Clinical Notes: Severe sleep fragmentation reported. High physical load but comp
       const [rawTextPaste, setRawTextPaste] = useState('');
       const [inputTab, setInputTab] = useState('upload'); 
 
-      // Context-aware query bot
+      // Context-aware query bot state
       const [chatMessages, setChatMessages] = useState([
         { 
           id: 1, 
@@ -169,12 +166,11 @@ Clinical Notes: Severe sleep fragmentation reported. High physical load but comp
       const fileInputRef = useRef(null);
       const chatEndRef = useRef(null);
 
-      // Injected runtime keys (if any) or fallback input
+      // Injected system keys
       const SYSTEM_API_KEY = ""; 
       const activeKey = apiKeyInput.trim() || SYSTEM_API_KEY;
       const isKeyValid = connectionStatus === 'connected';
 
-      // --- STREAMING_CHUNK:Live HTTP Probe against Google Models Repository ---
       useEffect(() => {
         let active = true;
         if (!activeKey) {
@@ -185,7 +181,7 @@ Clinical Notes: Severe sleep fragmentation reported. High physical load but comp
         setConnectionStatus('validating');
 
         const verifyKey = async () => {
-          // Robust metadata endpoint that works reliably without causing content execution 404s
+          // Standard GET request to the models route (safest validation endpoint)
           const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${activeKey}`;
 
           try {
@@ -226,7 +222,6 @@ Clinical Notes: Severe sleep fragmentation reported. High physical load but comp
         };
       }, [activeKey]);
 
-      // --- STREAMING_CHUNK:State commands and actions... ---
       const triggerToast = (message, type = 'info') => {
         setToast({ show: true, message, type });
         setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 4000);
@@ -296,7 +291,6 @@ Clinical Notes: Severe sleep fragmentation reported. High physical load but comp
         reader.readAsText(file);
       };
 
-      // --- STREAMING_CHUNK:Structuring clinical text payload schemas using Gemini... ---
       const processRawMedicalText = async (rawText, sourceName = "pasted_report.txt") => {
         saveStateToHistory();
         setIsAnalyzing(true);
@@ -426,7 +420,6 @@ Clinical Notes: Severe sleep fragmentation reported. High physical load but comp
         await processRawMedicalText(rawTextPaste, `Pasted_Report_${Date.now().toString().slice(-4)}.txt`);
       };
 
-      // --- STREAMING_CHUNK:Setting up Chat stream and API integration... ---
       const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!userInput.trim()) return;
@@ -550,7 +543,6 @@ Clinical Notes: Severe sleep fragmentation reported. High physical load but comp
         }
       };
 
-      // Auto Scroll Chat
       useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, [chatMessages, chatLoading]);
@@ -569,7 +561,6 @@ Clinical Notes: Severe sleep fragmentation reported. High physical load but comp
         warningBg: isNightVision ? 'bg-[#2E200D] text-[#FCAD4E]' : 'bg-[#FCF4E3] text-[#B87014]',
       };
 
-      // --- STREAMING_CHUNK:Rendering Dashboard Layout and Core Components... ---
       return (
         <div className={`min-h-screen font-mono text-sm tracking-tight transition-colors duration-300 ${theme.bg}`}>
           
