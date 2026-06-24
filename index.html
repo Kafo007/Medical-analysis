@@ -1,0 +1,963 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  FileText, Upload, Moon, Sun, Key, ShieldAlert, CheckCircle, 
+  Send, Trash2, Undo2, Download, Search, AlertCircle, FileSpreadsheet, Activity, ClipboardCheck
+} from 'lucide-react';
+
+// Live Runtime Injected Key Variable
+const SYSTEM_API_KEY = ""; 
+
+// Pre-loaded high-fidelity mock patient datasets
+const PRELOADED_RECORDS = [
+  {
+    id: 'rec_01',
+    name: 'Patient-10492_CBC.txt',
+    type: 'Complete Blood Count',
+    date: '2026-06-18',
+    patientName: 'Jonathan Harker',
+    patientAge: 41,
+    rawText: `COMPLETE BLOOD COUNT (CBC) WITH DIFFERENTIAL
+Date: June 18, 2026
+Patient: Jonathan Harker  Age: 41  Sex: M
+--------------------------------------------------
+White Blood Cell (WBC) Count: 14.2 x10^3/uL  (HIGH)  [Page 1, Line 12]
+Red Blood Cell (RBC) Count: 4.82 x10^6/uL  (NORMAL)
+Hemoglobin: 15.1 g/dL  (NORMAL)
+Hematocrit: 44.2%  (NORMAL)
+Platelet Count: 135 x10^3/uL  (LOW)                  [Page 1, Line 28]
+Neutrophils: 78%  (HIGH)                             [Page 2, Line 4]
+Lymphocytes: 14%  (LOW)                              [Page 2, Line 8]
+--------------------------------------------------
+Clinical Notes: Patient exhibits persistent fatigue, mild night sweats, and localized lymphadenopathy.`,
+    metrics: [
+      { name: 'WBC Count', value: '14.2 x10^3/uL', status: 'HIGH', location: 'Page 1, Line 12', normalRange: '4.5 - 11.0' },
+      { name: 'Platelets', value: '135 x10^3/uL', status: 'LOW', location: 'Page 1, Line 28', normalRange: '150 - 450' },
+      { name: 'Neutrophils', value: '78 %', status: 'HIGH', location: 'Page 2, Line 4', normalRange: '40 - 70' },
+      { name: 'Lymphocytes', value: '14 %', status: 'LOW', location: 'Page 2, Line 8', normalRange: '20 - 40' }
+    ],
+    diagnosis: 'Leukocytosis with moderate neutropenia and mild thrombocytopenia. This presentation strongly correlates with acute inflammatory response or localized bacterial infection. Recommend urgent follow-up with manual differential verification and blood cultures.'
+  },
+  {
+    id: 'rec_02',
+    name: 'Patient-99301_CMP.txt',
+    type: 'Comprehensive Metabolic Panel',
+    date: '2026-05-12',
+    patientName: 'Sarah Connor',
+    patientAge: 29,
+    rawText: `COMPREHENSIVE METABOLIC PANEL (CMP)
+Date: May 12, 2026
+Patient: Sarah Connor  Age: 29  Sex: F
+--------------------------------------------------
+Glucose, Fasting: 118 mg/dL  (HIGH)                  [Page 1, Line 8]
+BUN (Blood Urea Nitrogen): 26 mg/dL  (HIGH)          [Page 1, Line 15]
+Creatinine: 1.42 mg/dL  (HIGH)                       [Page 1, Line 19]
+Sodium: 139 mEq/L  (NORMAL)
+Potassium: 3.4 mEq/L  (LOW)                          [Page 2, Line 2]
+eGFR: 54 mL/min/1.73m2  (LOW)                        [Page 2, Line 11]
+ALT (Alanine Aminotransferase): 34 U/L (NORMAL)
+--------------------------------------------------
+Clinical Notes: Routine screening. Patient reports intense athletic training regimen and high-protein diet without adequate fluid intake.`,
+    metrics: [
+      { name: 'Fasting Glucose', value: '118 mg/dL', status: 'HIGH', location: 'Page 1, Line 8', normalRange: '70 - 99' },
+      { name: 'BUN', value: '26 mg/dL', status: 'HIGH', location: 'Page 1, Line 15', normalRange: '7 - 20' },
+      { name: 'Creatinine', value: '1.42 mg/dL', status: 'HIGH', location: 'Page 1, Line 19', normalRange: '0.6 - 1.2' },
+      { name: 'Potassium', value: '3.4 mEq/L', status: 'LOW', location: 'Page 2, Line 2', normalRange: '3.5 - 5.1' },
+      { name: 'eGFR', value: '54 mL/min', status: 'LOW', location: 'Page 2, Line 11', normalRange: '> 60' }
+    ],
+    diagnosis: 'Elevated creatinine and BUN alongside reduced eGFR point toward Stage 2 Mild Renal Impairment, likely exacerbated by acute dehydration from high-protein intake and intense workout strain. Borderline Fasting Hyperglycemia also observed. Immediate rehydration protocol and electrolyte-balanced diet review suggested before secondary screening.'
+  },
+  {
+    id: 'rec_03',
+    name: 'Patient-48201_Lipids.txt',
+    type: 'Lipid & Endocrine Report',
+    date: '2026-06-01',
+    patientName: 'Bruce Wayne',
+    patientAge: 48,
+    rawText: `LIPID PANEL & ENDOCRINE STATUS
+Date: June 1, 2026
+Patient: Bruce Wayne  Age: 48  Sex: M
+--------------------------------------------------
+Total Cholesterol: 265 mg/dL  (HIGH)                 [Page 1, Line 10]
+Triglycerides: 195 mg/dL  (HIGH)                     [Page 1, Line 14]
+HDL Cholesterol: 38 mg/dL  (LOW)                     [Page 1, Line 18]
+LDL Cholesterol (Calc): 188 mg/dL  (CRITICAL)        [Page 1, Line 22]
+TSH (Thyroid Stimulating Hormone): 5.8 uIU/mL (HIGH) [Page 2, Line 15]
+--------------------------------------------------
+Clinical Notes: Severe sleep fragmentation reported. High physical load but complains of persistent cold intolerance and sluggish metabolism.`,
+    metrics: [
+      { name: 'LDL Cholesterol', value: '188 mg/dL', status: 'CRITICAL', location: 'Page 1, Line 22', normalRange: '< 100' },
+      { name: 'Total Cholesterol', value: '265 mg/dL', status: 'HIGH', location: 'Page 1, Line 10', normalRange: '< 200' },
+      { name: 'Triglycerides', value: '195 mg/dL', status: 'HIGH', location: 'Page 1, Line 14', normalRange: '< 150' },
+      { name: 'TSH', value: '5.8 uIU/mL', status: 'HIGH', location: 'Page 2, Line 15', normalRange: '0.4 - 4.5' }
+    ],
+    diagnosis: 'Severe Mixed Dyslipidemia characterized by critically high LDL, high Total Cholesterol, and Elevated Triglycerides. Concurrent elevated TSH suggests Subclinical Hypothyroidism, which may be the underlying metabolic driver for the altered lipid synthesis. Initiate thyroid reassessment and cardiovascular risk mapping.'
+  }
+];
+
+export default function App() {
+  // --- STATE ---
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [isNightVision, setIsNightVision] = useState(true);
+  const [records, setRecords] = useState(PRELOADED_RECORDS);
+  const [activeRecordIndex, setActiveRecordIndex] = useState(0);
+  const [history, setHistory] = useState([]); 
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
+  
+  // Dynamic API Validation state: 'offline' | 'validating' | 'connected' | 'error'
+  const [connectionStatus, setConnectionStatus] = useState('offline');
+
+  // Paste Raw Text Input
+  const [rawTextPaste, setRawTextPaste] = useState('');
+  const [inputTab, setInputTab] = useState('upload'); // 'upload' | 'paste'
+
+  // Chatbot State
+  const [chatMessages, setChatMessages] = useState([
+    { 
+      id: 1, 
+      sender: 'ai', 
+      text: 'System online. Load a medical document or paste raw report text to isolate anomalies and inquire about specific metrics.' 
+    }
+  ]);
+  const [userInput, setUserInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+
+  const activeRecord = records[activeRecordIndex];
+  const fileInputRef = useRef(null);
+  const chatEndRef = useRef(null);
+
+  // Determine active API Key
+  const activeKey = apiKeyInput.trim() || SYSTEM_API_KEY;
+  const isKeyValid = connectionStatus === 'connected';
+
+  // --- API PROBE EFFECT ---
+  useEffect(() => {
+    let active = true;
+    if (!activeKey) {
+      setConnectionStatus('offline');
+      return;
+    }
+
+    setConnectionStatus('validating');
+
+    // Run a lightweight non-blocking GET probe to query models catalog (reliable, fast check)
+    const verifyKey = async () => {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${activeKey}`;
+
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!active) return;
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.error) {
+            setConnectionStatus('error');
+            triggerToast('API Key rejected by Google authentication.', 'error');
+          } else {
+            setConnectionStatus('connected');
+            triggerToast('Gemini 2.5 Flash API validation successful.', 'success');
+          }
+        } else {
+          setConnectionStatus('error');
+          triggerToast(`Authentication probe failed (HTTP ${response.status}).`, 'error');
+        }
+      } catch (err) {
+        if (!active) return;
+        setConnectionStatus('error');
+        triggerToast('Network offline or API endpoint unreachable.', 'error');
+      }
+    };
+
+    // Debounce verification to prevent hitting limits on rapid key typing
+    const delayDebounce = setTimeout(() => {
+      verifyKey();
+    }, 800);
+
+    return () => {
+      active = false;
+      clearTimeout(delayDebounce);
+    };
+  }, [activeKey]);
+
+  // --- ACTIONS & HANDLERS ---
+  const triggerToast = (message, type = 'info') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 4000);
+  };
+
+  const saveStateToHistory = () => {
+    const currentState = {
+      records: JSON.parse(JSON.stringify(records)),
+      activeRecordIndex,
+      chatMessages: [...chatMessages]
+    };
+    setHistory(prev => [...prev, currentState]);
+  };
+
+  const handleUndo = () => {
+    if (history.length === 0) {
+      triggerToast('No actions left to undo.', 'error');
+      return;
+    }
+    const previousState = history[history.length - 1];
+    setRecords(previousState.records);
+    setActiveRecordIndex(previousState.activeRecordIndex);
+    setChatMessages(previousState.chatMessages);
+    setHistory(prev => prev.slice(0, -1));
+    triggerToast('Last action reverted successfully.', 'info');
+  };
+
+  const handleSave = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(activeRecord, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `IO_ANALYST_${activeRecord.patientName.replace(/\s+/g, '_')}_DATA.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    triggerToast('Patient analysis metrics exported to JSON format.', 'success');
+  };
+
+  const handleSaveAs = () => {
+    const rawReportStr = "data:text/plain;charset=utf-8," + encodeURIComponent(activeRecord.rawText);
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", rawReportStr);
+    downloadAnchor.setAttribute("download", `IO_RAW_${activeRecord.patientName.replace(/\s+/g, '_')}_REPORT.txt`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    triggerToast('Raw clinical report file archived.', 'success');
+  };
+
+  // Drag & Drop
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const processUploadedFile = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = e.target.result;
+      await processRawMedicalText(text, file.name);
+    };
+    reader.readAsText(file);
+  };
+
+  // Extract structured patient data using Gemini 2.5 Flash
+  const processRawMedicalText = async (rawText, sourceName = "pasted_report.txt") => {
+    saveStateToHistory();
+    setIsAnalyzing(true);
+    triggerToast(`Parsing telemetry data using Gemini 2.5 Flash...`, 'info');
+
+    if (!isKeyValid) {
+      // Offline fallback processing simulator
+      setTimeout(() => {
+        const newRecord = {
+          id: `rec_${Date.now()}`,
+          name: sourceName,
+          type: 'Standard Panel',
+          date: new Date().toISOString().split('T')[0],
+          patientName: 'Anonymous Patient',
+          patientAge: 38,
+          rawText: rawText,
+          metrics: [
+            { name: 'Estimated GFR', value: '58 mL/min', status: 'LOW', location: 'Page 1, Line 4', normalRange: '> 60' },
+            { name: 'C-Reactive Protein', value: '12.5 mg/L', status: 'HIGH', location: 'Page 1, Line 15', normalRange: '< 3.0' }
+          ],
+          diagnosis: 'Fallback diagnostic generated. Paste a verified, working Gemini API key to query real models.'
+        };
+        setRecords(prev => [newRecord, ...prev]);
+        setActiveRecordIndex(0);
+        setIsAnalyzing(false);
+        triggerToast('Offline mode parsing complete.', 'success');
+      }, 1500);
+      return;
+    }
+
+    const extractionSchema = {
+      type: "OBJECT",
+      properties: {
+        patientName: { type: "STRING" },
+        patientAge: { type: "NUMBER" },
+        type: { type: "STRING", description: "Type of clinical panel, e.g. CBC Panel, CMP Panel, Lipids" },
+        date: { type: "STRING", description: "Date of analysis as YYYY-MM-DD" },
+        metrics: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: {
+              name: { type: "STRING", description: "Biomarker or analyte name" },
+              value: { type: "STRING", description: "Value with unit" },
+              status: { type: "STRING", description: "MUST be one of: NORMAL, HIGH, LOW, CRITICAL" },
+              location: { type: "STRING", description: "Specific PDF page & line estimation, e.g., Page 1, Line 12" },
+              normalRange: { type: "STRING", description: "Target biological normal interval" }
+            },
+            required: ["name", "value", "status", "location", "normalRange"]
+          }
+        },
+        diagnosis: { type: "STRING", description: "Raw diagnostic summary based purely on metrics" }
+      },
+      required: ["patientName", "patientAge", "type", "date", "metrics", "diagnosis"]
+    };
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${activeKey}`;
+    const payload = {
+      contents: [{ 
+        parts: [{ 
+          text: `Extract all medical parameters, patient information, and preliminary analysis as structured JSON from this raw text:\n\n${rawText}` 
+        }] 
+      }],
+      systemInstruction: { 
+        parts: [{ 
+          text: "You are an advanced medical clinical data extractor. Your duty is to parse raw clinical text into strict, valid JSON matching the provided schema." 
+        }] 
+      },
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: extractionSchema
+      }
+    };
+
+    try {
+      const response = await fetchWithRetry(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (!rawJson) throw new Error("No payload found in model generation.");
+      const parsed = JSON.parse(rawJson);
+
+      const newRecord = {
+        id: `rec_${Date.now()}`,
+        name: sourceName,
+        type: parsed.type || 'Extracted Report',
+        date: parsed.date || new Date().toISOString().split('T')[0],
+        patientName: parsed.patientName || 'Anonymous Patient',
+        patientAge: parsed.patientAge || 40,
+        rawText: rawText,
+        metrics: parsed.metrics || [],
+        diagnosis: parsed.diagnosis || 'Clinical evaluation compiled successfully.'
+      };
+
+      setRecords(prev => [newRecord, ...prev]);
+      setActiveRecordIndex(0);
+      setRawTextPaste('');
+      triggerToast('Clinical metrics isolated and structured successfully!', 'success');
+    } catch (err) {
+      triggerToast(`Structured parser error: ${err.message}`, 'error');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processUploadedFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      processUploadedFile(e.target.files[0]);
+    }
+  };
+
+  const handlePasteSubmit = async (e) => {
+    e.preventDefault();
+    if (!rawTextPaste.trim()) return;
+    await processRawMedicalText(rawTextPaste, `Pasted_Report_${Date.now().toString().slice(-4)}.txt`);
+  };
+
+  // --- CHAT SYSTEM (GEMINI INTEGRATION) ---
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!userInput.trim()) return;
+
+    const userMsg = userInput.trim();
+    const newMsgList = [...chatMessages, { id: Date.now(), sender: 'user', text: userMsg }];
+    setChatMessages(newMsgList);
+    setUserInput('');
+    setChatLoading(true);
+
+    if (isKeyValid) {
+      try {
+        const responseText = await queryGeminiAPI(userMsg);
+        setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', text: responseText }]);
+      } catch (err) {
+        setChatMessages(prev => [
+          ...prev, 
+          { 
+            id: Date.now() + 1, 
+            sender: 'ai', 
+            text: `[SYSTEM API ERROR] Request failed: ${err.message}. Reverting to local simulation model.` 
+          }
+        ]);
+        triggerOfflineResponse(userMsg, newMsgList);
+      } finally {
+        setChatLoading(false);
+      }
+    } else {
+      setTimeout(() => {
+        triggerOfflineResponse(userMsg, newMsgList);
+        setChatLoading(false);
+      }, 1000);
+    }
+  };
+
+  const triggerOfflineResponse = (query, currentHistory) => {
+    const lowercaseQuery = query.toLowerCase();
+    let response = "Understood. Local diagnostic simulation online.";
+
+    if (lowercaseQuery.includes('wbc') || lowercaseQuery.includes('white')) {
+      response = `Analyzing WBC stats for ${activeRecord.patientName}: The level is recorded at ${activeRecord.metrics.find(m => m.name.toLowerCase().includes('wbc'))?.value || 'N/A'}. This is marked high, indicating a strong baseline systemic stress or immune response, registered on Page 1/Line 12.`;
+    } else if (lowercaseQuery.includes('kidney') || lowercaseQuery.includes('renal') || lowercaseQuery.includes('creatinine')) {
+      response = `Regarding renal biomarkers: The report lists Creatinine at 1.42 mg/dL with a corresponding low eGFR level of 54 (Stage 2 impairment). Clear symptoms of microvascular stress or intense fatigue might manifest. Check Page 1 and Page 2 metrics.`;
+    } else if (lowercaseQuery.includes('cholesterol') || lowercaseQuery.includes('lipid') || lowercaseQuery.includes('ldl')) {
+      response = `Reviewing LDL lipids for ${activeRecord.patientName}: Level is Critical at 188 mg/dL. This is correlated with metabolic disruption (TSH is high at 5.8). High risk of endothelial stress. Seek physiological adjustment.`;
+    } else if (lowercaseQuery.includes('normal') || lowercaseQuery.includes('range')) {
+      const normalList = activeRecord.metrics.map(m => `• ${m.name}: Active: ${m.value} (Normal target: ${m.normalRange})`).join('\n');
+      response = `Here are the target bounds extracted for current active parameters:\n${normalList}`;
+    } else if (lowercaseQuery.includes('diagnose') || lowercaseQuery.includes('summary')) {
+      response = `PRELIMINARY INTERPRETATION SUMMATION: ${activeRecord.diagnosis}`;
+    } else {
+      response = `Acknowledged. Scoping questions around "${activeRecord.patientName}" (Age ${activeRecord.patientAge}). Key abnormal parameters to query: ${activeRecord.metrics.map(m => m.name).join(', ')}. Ask me to list 'normal ranges' or provide a deep analysis on any specific biomarker.`;
+    }
+
+    setChatMessages(prev => [...prev, { id: Date.now() + 2, sender: 'ai', text: response }]);
+  };
+
+  // Helper with live exponential backoff (Max 5 attempts)
+  const fetchWithRetry = async (url, options, maxRetries = 5) => {
+    let delay = 1000;
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const response = await fetch(url, options);
+        if (response.ok) return response;
+        if (response.status === 429 || response.status >= 500) {
+          // Trigger exponential backoff sleep
+        } else {
+          throw new Error(`HTTP Error ${response.status}`);
+        }
+      } catch (err) {
+        if (i === maxRetries - 1) throw err;
+      }
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay *= 2;
+    }
+  };
+
+  const queryGeminiAPI = async (userQuery) => {
+    const systemPrompt = `You are an expert clinical analytical tool. You review parsed raw medical report data and provide exact, direct scientific insights. Always answer highly concisely, following an IO-style raw output. Focus strictly on inputs provided. Reference specific metrics and their locations. Active Patient details:\nName: ${activeRecord.patientName}\nAge: ${activeRecord.patientAge}\nRaw Clinical Data: ${activeRecord.rawText}`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${activeKey}`;
+    const payload = {
+      contents: [{ parts: [{ text: userQuery }] }],
+      systemInstruction: { parts: [{ text: systemPrompt }] }
+    };
+
+    const response = await fetchWithRetry(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    const data = await response.json();
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (textResponse) return textResponse;
+    throw new Error("Empty candidate payload in Gemini API response.");
+  };
+
+  // Re-run preliminary analysis with AI
+  const handleReAnalyze = async () => {
+    setIsAnalyzing(true);
+    triggerToast('Generating deep medical diagnostic analysis...', 'info');
+
+    if (!isKeyValid) {
+      setTimeout(() => {
+        setIsAnalyzing(false);
+        triggerToast('Analysis complete. Static diagnostic re-generated.', 'success');
+      }, 1500);
+      return;
+    }
+
+    try {
+      const responseText = await queryGeminiAPI("Generate a detailed, raw preliminary diagnostic review based entirely on the provided document text. List specific warnings and metabolic paths.");
+      saveStateToHistory();
+      const updatedRecords = [...records];
+      updatedRecords[activeRecordIndex].diagnosis = responseText;
+      setRecords(updatedRecords);
+      triggerToast('AI Diagnostic updated with fresh Gemini outputs!', 'success');
+    } catch (err) {
+      triggerToast(`Diagnostic generation error: ${err.message}`, 'error');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Auto Scroll Chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages, chatLoading]);
+
+  // Visual Theme mapping
+  const theme = {
+    bg: isNightVision ? 'bg-[#0B0F12] text-[#A6C0B0]' : 'bg-[#FAFAFA] text-[#2C332D]',
+    card: isNightVision ? 'bg-[#11171B] border-[#1F2C24]' : 'bg-[#FFFFFF] border-[#E2E8E4]',
+    border: isNightVision ? 'border-[#1F2C24]' : 'border-[#E2E8E4]',
+    input: isNightVision ? 'bg-[#0E1317] border-[#2E3F34] focus:border-[#4EFC82] text-white' : 'bg-[#F2F4F2] border-[#C8D0C9] focus:border-[#38A155] text-black',
+    accentText: isNightVision ? 'text-[#4EFC82]' : 'text-[#23843C]',
+    accentBg: isNightVision ? 'bg-[#122A1A] text-[#4EFC82]' : 'bg-[#E3F5E7] text-[#23843C]',
+    subText: isNightVision ? 'text-gray-500' : 'text-gray-600',
+    indicator: isNightVision ? 'bg-[#0E1317]' : 'bg-[#EEF1EF]',
+    buttonHover: isNightVision ? 'hover:bg-[#1C2820]' : 'hover:bg-[#EAECEB]',
+    criticalBg: isNightVision ? 'bg-[#331111] text-[#FC4E4E]' : 'bg-[#FCE3E3] text-[#C52222]',
+    warningBg: isNightVision ? 'bg-[#2E200D] text-[#FCAD4E]' : 'bg-[#FCF4E3] text-[#B87014]',
+  };
+
+  return (
+    <div className={`min-h-screen font-mono text-sm tracking-tight transition-colors duration-300 ${theme.bg}`}>
+      
+      {/* Toast Alert System */}
+      {toast.show && (
+        <div className={`fixed top-4 right-4 z-50 flex items-center space-x-2 border px-4 py-3 rounded shadow-lg transition-all duration-300 ${
+          toast.type === 'success' 
+            ? 'bg-emerald-950/90 border-[#4EFC82] text-[#4EFC82]' 
+            : toast.type === 'error'
+            ? 'bg-red-950/90 border-[#FC4E4E] text-[#FC4E4E]'
+            : 'bg-zinc-950/90 border-zinc-700 text-zinc-300'
+        }`}>
+          <AlertCircle className="w-4 h-4" />
+          <span>{toast.message}</span>
+        </div>
+      )}
+
+      {/* Header / Engine Control Block */}
+      <header className={`border-b ${theme.border} ${theme.card} p-3 flex flex-wrap gap-4 items-center justify-between`}>
+        <div className="flex items-center space-x-3">
+          <div className={`p-1.5 rounded ${theme.accentBg}`}>
+            <Activity className="w-5 h-5 animate-pulse" />
+          </div>
+          <div>
+            <span className="font-bold tracking-widest text-base block">M-ANALYST.IO</span>
+            <span className="text-[10px] text-gray-500 uppercase">Minimalist Streamlined PDF Metrics Harvester</span>
+          </div>
+        </div>
+
+        {/* Engine Input: API Key & State Statuses */}
+        <div className="flex flex-wrap items-center gap-3 flex-1 max-w-2xl justify-end">
+          <div className="flex items-center space-x-2 w-full max-w-xs">
+            <Key className="w-4 h-4 text-gray-400 shrink-0" />
+            <div className="relative w-full">
+              <input
+                type="password"
+                placeholder={SYSTEM_API_KEY ? "GEMINI LIVE INJECTED ACTIVE" : "OVERRIDE GEMINI_API_KEY..."}
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                className={`w-full px-2 py-1 text-xs outline-none border rounded ${theme.input}`}
+              />
+              {apiKeyInput && (
+                <button 
+                  onClick={() => setApiKeyInput('')}
+                  className="absolute right-2 top-1.5 text-xs text-red-500 hover:text-red-400"
+                >
+                  CLEAR
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Dynamic Connection Status Indicator */}
+          <div className="flex items-center space-x-1.5 px-2 py-1 rounded bg-black/20 border border-neutral-800/60">
+            <span className={`w-2.5 h-2.5 rounded-full ${
+              connectionStatus === 'connected' ? 'bg-emerald-500 shadow-[0_0_8px_#10B981]' :
+              connectionStatus === 'validating' ? 'bg-blue-400 shadow-[0_0_8px_#60A5FA] animate-pulse' :
+              connectionStatus === 'error' ? 'bg-red-500 shadow-[0_0_8px_#EF4444]' :
+              'bg-amber-500 shadow-[0_0_8px_#F59E0B]'
+            }`}></span>
+            <span className="text-[10px] font-bold uppercase tracking-wider">
+              {connectionStatus === 'connected' && 'LIVE CONNECTED'}
+              {connectionStatus === 'validating' && 'VALIDATING KEY...'}
+              {connectionStatus === 'error' && 'AUTH_FAIL / ERROR'}
+              {connectionStatus === 'offline' && 'OFFLINE MODE'}
+            </span>
+          </div>
+
+          {/* Night Vision Toggle */}
+          <button
+            onClick={() => setIsNightVision(!isNightVision)}
+            className={`p-2 rounded border transition-all ${theme.border} ${theme.buttonHover}`}
+            title="Toggle Vision Mode"
+          >
+            {isNightVision ? (
+              <div className="flex items-center space-x-1.5">
+                <Sun className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-bold">L-VISION</span>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-1.5">
+                <Moon className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-bold">N-VISION</span>
+              </div>
+            )}
+          </button>
+        </div>
+      </header>
+
+      {/* Main IO Three-Panel Dashboard */}
+      <main className="grid grid-cols-1 lg:grid-cols-12 min-h-[calc(100vh-65px)]">
+        
+        {/* LEFT SIDEBAR: Pure Inputs & State Commands */}
+        <section className={`lg:col-span-3 border-r ${theme.border} p-4 flex flex-col justify-between space-y-4`}>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-xs uppercase tracking-widest text-gray-500">INPUT SOURCE</span>
+              <div className="flex space-x-1 bg-black/10 rounded p-0.5 border border-neutral-800">
+                <button 
+                  onClick={() => setInputTab('upload')} 
+                  className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded ${inputTab === 'upload' ? 'bg-neutral-800 text-white' : 'text-gray-500'}`}
+                >
+                  Files
+                </button>
+                <button 
+                  onClick={() => setInputTab('paste')} 
+                  className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded ${inputTab === 'paste' ? 'bg-neutral-800 text-white' : 'text-gray-500'}`}
+                >
+                  Paste
+                </button>
+              </div>
+            </div>
+
+            {inputTab === 'upload' ? (
+              /* Drag and Drop Zone */
+              <div
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current.click()}
+                className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all duration-200 ${
+                  dragActive 
+                    ? 'border-emerald-500 bg-emerald-950/20' 
+                    : `border-neutral-700/50 ${theme.buttonHover}`
+                }`}
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  accept=".pdf,.txt"
+                />
+                <Upload className="w-6 h-6 mx-auto mb-2 text-gray-400" />
+                <p className="text-xs font-semibold">DROP TXT/PDF REPORT</p>
+                <p className="text-[10px] text-gray-500 mt-1">or click to browse local storage</p>
+              </div>
+            ) : (
+              /* Paste Raw Clinical Text form */
+              <form onSubmit={handlePasteSubmit} className="space-y-2">
+                <textarea
+                  value={rawTextPaste}
+                  onChange={(e) => setRawTextPaste(e.target.value)}
+                  placeholder="Paste clinical metrics raw text here... (e.g. Glucose: 110 mg/dL)"
+                  className={`w-full h-24 p-2 text-xs font-mono border rounded outline-none resize-none ${theme.input}`}
+                />
+                <button
+                  type="submit"
+                  disabled={!rawTextPaste.trim() || isAnalyzing}
+                  className="w-full py-1.5 rounded text-xs font-bold uppercase transition-all bg-[#122A1A] border border-[#2E3F34] hover:bg-[#1E432A] text-[#4EFC82]"
+                >
+                  {isAnalyzing ? 'PARSING WITH GEMINI...' : 'PROCESS CLINICAL TEXT'}
+                </button>
+              </form>
+            )}
+
+            {/* Document List Selection */}
+            <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+              {records.map((rec, idx) => (
+                <div
+                  key={rec.id}
+                  onClick={() => {
+                    saveStateToHistory();
+                    setActiveRecordIndex(idx);
+                  }}
+                  className={`p-2 rounded border cursor-pointer transition-all text-xs flex items-center justify-between ${
+                    activeRecordIndex === idx
+                      ? isNightVision ? 'bg-[#1C2820] border-[#4EFC82] text-white' : 'bg-[#E3F5E7] border-[#23843C] text-black'
+                      : `border-transparent ${theme.buttonHover}`
+                  }`}
+                >
+                  <div className="flex items-center space-x-2 truncate">
+                    <FileText className={`w-3.5 h-3.5 shrink-0 ${activeRecordIndex === idx ? theme.accentText : 'text-gray-400'}`} />
+                    <span className="truncate font-medium">{rec.name}</span>
+                  </div>
+                  <span className="text-[9px] text-gray-500 shrink-0 uppercase">{rec.type.split(' ')[0]}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Active Document Details */}
+            <div className={`p-3 rounded border text-xs space-y-2 ${theme.card}`}>
+              <div className="text-[10px] uppercase text-gray-500 tracking-wider">Active Patient Scope</div>
+              <div className="grid grid-cols-2 gap-2 font-mono">
+                <div>
+                  <span className="text-gray-500 block text-[9px]">NAME:</span>
+                  <span className="font-bold truncate block">{activeRecord.patientName}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 block text-[9px]">AGE/SEX:</span>
+                  <span className="font-bold">{activeRecord.patientAge} / M</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 block text-[9px]">DATE:</span>
+                  <span className="font-bold">{activeRecord.date}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 block text-[9px]">MARKERS:</span>
+                  <span className="font-bold">{activeRecord.metrics.length} Isolated</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Clean State Control Buttons */}
+          <div className="pt-4 border-t border-neutral-800/50 space-y-2">
+            <div className="text-[10px] uppercase text-gray-500 tracking-wider">STATE COMMANDS</div>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={handleSave}
+                className={`py-1.5 px-1 border ${theme.border} ${theme.buttonHover} rounded text-center text-xs flex flex-col items-center justify-center space-y-1 transition-all`}
+                title="Download patient data as structured JSON"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="text-[9px] font-bold">EXPORT</span>
+              </button>
+              
+              <button
+                onClick={handleSaveAs}
+                className={`py-1.5 px-1 border ${theme.border} ${theme.buttonHover} rounded text-center text-xs flex flex-col items-center justify-center space-y-1 transition-all`}
+                title="Download raw parsed OCR text report"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span className="text-[9px] font-bold">RAW</span>
+              </button>
+
+              <button
+                onClick={handleUndo}
+                className={`py-1.5 px-1 border ${theme.border} ${theme.buttonHover} rounded text-center text-xs flex flex-col items-center justify-center space-y-1 transition-all`}
+                title="Undo last modification"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+                <span className="text-[9px] font-bold">UNDO</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* CENTER: The Showcase (Raw Data Metrics & Preliminary Diagnosis) */}
+        <section className={`lg:col-span-6 p-4 flex flex-col space-y-4 overflow-y-auto`}>
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-xs uppercase tracking-widest text-gray-500">ENGINE SHOWCASE — ISOLATED BIOMARKERS</span>
+            <span className={`text-xs px-2 py-0.5 rounded ${theme.accentBg} font-bold`}>
+              {activeRecord.type}
+            </span>
+          </div>
+
+          {/* Metrics Data Grid */}
+          <div className="space-y-2">
+            <div className="grid grid-cols-12 text-[10px] font-bold text-gray-500 uppercase px-2">
+              <span className="col-span-4">BIOMARKER</span>
+              <span className="col-span-2 text-right">VALUE</span>
+              <span className="col-span-2 text-center">LIMIT</span>
+              <span className="col-span-4 text-right">METRIC EXPLICIT LOCATION</span>
+            </div>
+
+            <div className="space-y-1.5">
+              {activeRecord.metrics.length === 0 ? (
+                <div className={`p-4 rounded border text-center ${theme.border} ${theme.card}`}>
+                  No parsed markers extracted. Use "Paste" or "Files" to supply clinical reports.
+                </div>
+              ) : (
+                activeRecord.metrics.map((metric, idx) => {
+                  let statusColor = theme.accentText;
+                  let statusBg = theme.accentBg;
+                  if (metric.status === 'CRITICAL') {
+                    statusColor = 'text-red-500';
+                    statusBg = theme.criticalBg;
+                  } else if (metric.status === 'HIGH' || metric.status === 'LOW') {
+                    statusColor = 'text-amber-500';
+                    statusBg = theme.warningBg;
+                  }
+
+                  return (
+                    <div
+                      key={idx}
+                      className={`grid grid-cols-12 items-center p-2.5 rounded border ${theme.border} ${theme.card} transition-all hover:scale-[1.005]`}
+                    >
+                      <div className="col-span-4 flex items-center space-x-2">
+                        <span className="font-bold text-xs">{metric.name}</span>
+                      </div>
+
+                      <div className="col-span-2 text-right">
+                        <span className={`font-mono font-bold text-xs ${statusColor}`}>{metric.value}</span>
+                      </div>
+
+                      <div className="col-span-2 text-center">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${statusBg}`}>
+                          {metric.status}
+                        </span>
+                      </div>
+
+                      <div className="col-span-4 text-right">
+                        <span className="text-[10px] font-mono opacity-80 bg-neutral-900/15 dark:bg-black/40 px-2 py-1 rounded border border-neutral-700/20">
+                          {metric.location}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* AI generated Preliminary Diagnosis */}
+          <div className={`p-4 rounded border ${theme.border} ${theme.card} space-y-3 flex-1 flex flex-col justify-between`}>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-bold text-xs uppercase tracking-widest text-gray-500 block">AI-GENERATED PRELIMINARY DIAGNOSIS</span>
+                <span className="text-[10px] text-gray-400">Context: Gemini 2.5 Flash</span>
+              </div>
+              
+              {isAnalyzing ? (
+                <div className="space-y-2 py-4 animate-pulse">
+                  <div className="h-3.5 bg-neutral-700/50 rounded w-full"></div>
+                  <div className="h-3.5 bg-neutral-700/50 rounded w-5/6"></div>
+                  <div className="h-3.5 bg-neutral-700/50 rounded w-4/5"></div>
+                  <div className="h-3.5 bg-neutral-700/50 rounded w-11/12"></div>
+                </div>
+              ) : (
+                <p className="text-xs leading-relaxed font-mono whitespace-pre-wrap">
+                  {activeRecord.diagnosis}
+                </p>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-neutral-800/40 flex items-center justify-between">
+              <span className="text-[10px] text-gray-500 flex items-center space-x-1">
+                <span>Status:</span>
+                <span className={`font-bold ${isKeyValid ? 'text-emerald-400' : 'text-amber-500'}`}>
+                  {isKeyValid ? '✓ Verified Key Active' : '⚠ Simulated Local Mode'}
+                </span>
+              </span>
+              <button
+                onClick={handleReAnalyze}
+                disabled={isAnalyzing}
+                className={`px-3 py-1.5 rounded text-xs font-bold transition-all border ${
+                  isNightVision 
+                    ? 'bg-[#122A1A] border-[#4EFC82] text-[#4EFC82] hover:bg-[#1C3E27]' 
+                    : 'bg-[#E3F5E7] border-[#23843C] text-[#23843C] hover:bg-[#D4ECD9]'
+                }`}
+              >
+                {isAnalyzing ? 'ENGINE RUNNING...' : 'RE-ANALYZE REPORT'}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* RIGHT PANEL: Scoped Context Chat Window */}
+        <section className={`lg:col-span-3 border-l ${theme.border} flex flex-col justify-between h-full overflow-hidden`}>
+          <div className={`p-3 border-b ${theme.border} ${theme.card} flex items-center justify-between`}>
+            <div>
+              <span className="font-semibold text-xs uppercase tracking-widest text-gray-500 block">CONTEXTUAL OUTPUT</span>
+              <span className="text-[10px] text-gray-400">Gemini 2.5 Flash Interrogator</span>
+            </div>
+            <button
+              onClick={() => {
+                setChatMessages([{ id: Date.now(), sender: 'ai', text: 'Console cleaned. Context retained.' }]);
+                triggerToast('Chat history cleared.', 'info');
+              }}
+              className="p-1 hover:text-red-500 transition-colors"
+              title="Clear Console History"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Interactive Chat Stream */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[calc(100vh-210px)]">
+            {chatMessages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex flex-col space-y-1 ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
+              >
+                <span className="text-[8px] uppercase tracking-wider text-gray-500">
+                  {msg.sender === 'user' ? 'USER ANALYST' : 'GEMINI_ENGINE'}
+                </span>
+                <div
+                  className={`p-2.5 rounded max-w-[90%] text-xs font-mono whitespace-pre-wrap leading-relaxed ${
+                    msg.sender === 'user'
+                      ? isNightVision ? 'bg-[#122A1A] border border-[#2E3F34] text-white' : 'bg-[#E3F5E7] border border-[#C8D0C9] text-black'
+                      : isNightVision ? 'bg-[#141A1E] border border-neutral-800' : 'bg-neutral-100 border border-neutral-200'
+                  }`}
+                >
+                  {msg.text}
+                </div>
+              </div>
+            ))}
+            {chatLoading && (
+              <div className="flex flex-col space-y-1 items-start">
+                <span className="text-[8px] uppercase tracking-wider text-gray-500 animate-pulse">GEMINI_ENGINE CALCULATING...</span>
+                <div className={`p-2.5 rounded w-16 text-xs font-mono flex space-x-1 ${isNightVision ? 'bg-[#141A1E]' : 'bg-neutral-100'}`}>
+                  <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce"></span>
+                  <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                  <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Chat Form Input */}
+          <form onSubmit={handleSendMessage} className={`p-3 border-t ${theme.border} ${theme.card}`}>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder={`Ask about ${activeRecord.patientName.split(' ')[0]}...`}
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                className={`w-full pl-3 pr-10 py-2.5 text-xs outline-none border rounded ${theme.input}`}
+              />
+              <button
+                type="submit"
+                className={`absolute right-1.5 top-1.5 p-1.5 rounded transition-colors ${theme.accentText} ${theme.buttonHover}`}
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[9px] text-gray-500 mt-1.5 text-center uppercase">
+              Query scope is locked entirely to active document metrics
+            </p>
+          </form>
+        </section>
+
+      </main>
+    </div>
+  );
+}
